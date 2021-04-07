@@ -71,20 +71,38 @@ class Suggest(commands.Cog):
             if x['ModId'] == modId:
                 return x['ChannelUrl']
 
+    def is_suggestion_url(self, suggestion):
+        if 'curseforge.com' in suggestion:
+            return True
+        else:
+            return False
+
+    def search_mod(self, suggestion):
+        split = suggestion.split('mc-mods/')
+        searchString = split[1]
+
+        header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Safari/605.1.15'}
+        url = f'https://addons-ecs.forgesvc.net/api/v2/addon/{suggestion}'
+        response = requests.get(url, headers=header)
+
+
+
+
+
     @commands.command()
-    async def suggest(self, ctx,* ,modId: str):
+    async def suggest(self, ctx,* ,suggestion: str):
         if self.data == {}:
             print('Loading storage...')
             self.load_storage()
 
-        if self.mod_exists(modId):
+        if self.mod_exists(suggestion):
             newEmbed = discord.Embed(title='Mod has already been suggested..See below')
-            newEmbed.add_field(name='', value=f'{self.return_message_url(modId)}')
+            newEmbed.add_field(name='', value=f'{self.return_message_url(suggestion)}')
             await ctx.send(embed=newEmbed)
             return
 
         header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Safari/605.1.15'}
-        url = f'https://addons-ecs.forgesvc.net/api/v2/addon/{modId}'
+        url = f'https://addons-ecs.forgesvc.net/api/v2/addon/{suggestion}'
         response = requests.get(url, headers=header)
 
         if response.status_code != 200:
@@ -103,7 +121,7 @@ class Suggest(commands.Cog):
         await message.add_reaction('👍')
         await message.add_reaction('👎')
 
-        self.add_mod(modId,message.guild.id,message.channel.id, message.id)
+        self.add_mod(suggestion,message.guild.id,message.channel.id, message.id)
 
 def setup(bot):
     bot.add_cog(Suggest(bot))
