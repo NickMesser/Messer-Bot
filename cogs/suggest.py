@@ -90,14 +90,14 @@ class Suggest(commands.Cog):
 
 
     @commands.command()
-    async def suggest(self, ctx,* ,userInput: str):
+    async def suggest(self, ctx,* ,userInput: str = ''):
         args = userInput.split()
         if len(args) < 1:
             await ctx.send('Please input a project ID or a project link.')
             return
         else:
-            suggestion=args[0]
-            flags=''
+            suggestion = args[0]
+            flags = ''
             if len(args) >= 2:
                 flags = args[1]
         
