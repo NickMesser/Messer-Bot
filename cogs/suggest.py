@@ -90,7 +90,17 @@ class Suggest(commands.Cog):
 
 
     @commands.command()
-    async def suggest(self, ctx,* ,suggestion: str):
+    async def suggest(self, ctx,* ,userInput: str):
+        args = userInput.split()
+        if len(args) < 1:
+            await ctx.send('Please input a project ID or a project link.')
+            return
+        else:
+            suggestion=args[0]
+            flags=''
+            if len(args) >= 2:
+                flags = args[1]
+        
         if self.data == {}:
             print('Loading storage...')
             self.load_storage()
@@ -111,8 +121,8 @@ class Suggest(commands.Cog):
 
         mod = response.json()
             
-        if self.is_mod_fabric(mod) == False:
-            await ctx.send('Eww... Forge mods are gross...')
+        if self.is_mod_fabric(mod) == False and "-force" not in flags:
+            await ctx.send('Eww... this mod doesn\'t seam to be for fabric\nif you are sure that its fabric please sent the command again and add -force')
             return
 
         newEmbed = discord.Embed(title=mod['name'])
