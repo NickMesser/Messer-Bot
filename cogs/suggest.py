@@ -77,39 +77,52 @@ class Suggest(commands.Cog):
         else:
             return False
 
-    def search_mod(self, suggestion):
-        split = suggestion.split('mc-mods/')
-        searchString = split[1]
-
+    def get_mod_data_by_id(self,ctx, modId):
         header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Safari/605.1.15'}
-        url = f'https://addons-ecs.forgesvc.net/api/v2/addon/{suggestion}'
-        response = requests.get(url, headers=header)
-
-
-
-
-
-    @commands.command()
-    async def suggest(self, ctx,* ,suggestion: str):
-        if self.data == {}:
-            print('Loading storage...')
-            self.load_storage()
-
-        if self.mod_exists(suggestion):
-            newEmbed = discord.Embed(title='Mod has already been suggested..See below')
-            newEmbed.add_field(name='', value=f'{self.return_message_url(suggestion)}')
-            await ctx.send(embed=newEmbed)
-            return
-
-        header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Safari/605.1.15'}
-        url = f'https://addons-ecs.forgesvc.net/api/v2/addon/{suggestion}'
+        url = f'https://addons-ecs.forgesvc.net/api/v2/addon/{modId}'
         response = requests.get(url, headers=header)
 
         if response.status_code != 200:
-            await ctx.send('Please input a valid project ID.')
+            return None
+
+        return response.json()
+
+    def get_mod_data_by_url(self, ctx, url):
+        split = url.split('mc-mods/')
+        searchString = split[1]
+        header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Safari/605.1.15'}
+        responce = requests.get(f'https://addons-ecs.forgesvc.net/api/v2/addon/search?categoryId=0&gameId=432&gameVersion=&index=0&pageSize=255&searchFilter={searchString}&sectionId=0&sort=0', headers=header)
+        
+        if responce.status_code != 200:
+            return None
+
+        data = responce.json()
+        for x in data:
+            if x['slug'] == searchString:
+                return x
+
+        return None
+
+    @commands.command()
+    async def suggest(self, ctx,* ,userInput: str = ''):
+        if self.data == {}:
+            self.load_storage()
+
+        if self.is_suggestion_url(userInput):
+            mod = self.get_mod_data_by_url(ctx, userInput)
+        else:
+            mod = self.get_mod_data_by_id(ctx, userInput)
+
+        if mod is None:
+            await ctx.send('Please check input and try again. If problem persist please us the mods project id found on the mods homepage.')
             return
 
-        mod = response.json()
+        if self.mod_exists(mod['id']):
+            newEmbed = discord.Embed(title='Mod has already been suggested..See below')
+            modId = mod['id']
+            newEmbed.add_field(name='Message:', value=f'{self.return_message_url(modId)}')
+            await ctx.send(embed=newEmbed)
+            return
             
         if self.is_mod_fabric(mod) == False:
             await ctx.send('Eww... Forge mods are gross...')
@@ -121,7 +134,7 @@ class Suggest(commands.Cog):
         await message.add_reaction('👍')
         await message.add_reaction('👎')
 
-        self.add_mod(suggestion,message.guild.id,message.channel.id, message.id)
+        self.add_mod(mod['id'],message.guild.id,message.channel.id, message.id)
 
 def setup(bot):
     bot.add_cog(Suggest(bot))
