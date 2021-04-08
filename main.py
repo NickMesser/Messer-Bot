@@ -35,14 +35,11 @@ async def reload(ctx):
     bot.load_extension('cogs.suggest')
     ctx.send('Reloaded commands...')
 
-
 bot.load_extension('cogs.suggest')
 
 if data['BotToken'] == '':
   token = os.getenv('TOKEN')
 else:
   token = data['BotToken']
-
-print(token)
 
 bot.run(token)
