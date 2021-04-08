@@ -104,6 +104,17 @@ class Suggest(commands.Cog):
 
         return None
 
+    def update_mod(self, message, currentStage, mod):
+        for x in self.data:
+            if x['ModId'] == mod['ModId']:
+                x['MessageId'] == message.id
+                x['ChannelId'] = message.channel.id
+                x['ChannelUrl'] = f'https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}'
+                x['CurrentStage'] = currentStage.lower()
+
+        with open('storage.json' 'w') as f:
+            json.dump(self.data, f, sort_keys=True, indent=4)
+
     @commands.command()
     async def suggest(self, ctx,* ,userInput: str = ''):
         if self.data == None:
@@ -142,9 +153,41 @@ class Suggest(commands.Cog):
         self.add_mod(mod['id'],message.guild.id,message.channel.id, message.id)
 
     @commands.command
-    async def set_channel(self, ctx, *, channelToChange : str = '', id : str = ''):
-        await ctx.send('set channel command')
+    async def move(self, ctx, *, id : str = '', channelToChange : str = ''):
+        for x in self.data:
+            if x['ModId'] == id:
+                selectedMod = x
+
+        if selectedMod is None:
+            await ctx.send('Could not find exisiting mod. Check input and retry.')
+
+        channel = None
+
+        if channelToChange.lower() == 'suggestions':
+            channel = self.bot.get_channel('SuggestionChannelId')
+
+        if channelToChange.lower() == 'denied':
+            channel = self.bot.get_channel('DeniedChannelId')
+
+        if channelToChange.lower() == 'testing':
+            channel = self.bot.get_channel('TestingChannelId')
+
+        if channel == None:
+            await ctx.send('Please specify a valid channel.')
+
+        oldMsg = self.bot.get_channel(selectedMod['ChannelId']).fetch_message(selectedMod['MessageId'])
+        await oldMsg.delete()
+
+        newEmbed = discord.Embed(title=selectedMod['name'])
+        newEmbed.add_field(name='Link', value=selectedMod['websiteUrl'])
+        message = await channel.send(embed=newEmbed)
+        await message.add_reaction('👍')
+        await message.add_reaction('👎')
+
+        self.update_mod(message, channelToChange, selectedMod)
         
+            
+
 
 def setup(bot):
     bot.add_cog(Suggest(bot))
