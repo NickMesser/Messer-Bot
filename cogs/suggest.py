@@ -9,7 +9,7 @@ class Suggest(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    data = {}
+    data = None
     def json_exist(self, file_name):
         return os.path.exists(file_name)
 
@@ -23,6 +23,7 @@ class Suggest(commands.Cog):
                     "DeniedChannelId": 0,
                     "SuggestionChannelId": 0,
                     "TestingChannelId":0,
+                    "DiscussionChannelId":0,
                     "Suggestions": [
                         {
                             "ModId": '',
@@ -105,8 +106,11 @@ class Suggest(commands.Cog):
 
     @commands.command()
     async def suggest(self, ctx,* ,userInput: str = ''):
-        if self.data == {}:
+        if self.data == None:
             self.load_storage()
+
+        if ctx.message.channel.id != self.data['DiscussionChannelId']:
+            return
 
         if self.is_suggestion_url(userInput):
             mod = self.get_mod_data_by_url(ctx, userInput)
@@ -114,7 +118,7 @@ class Suggest(commands.Cog):
             mod = self.get_mod_data_by_id(ctx, userInput)
 
         if mod is None:
-            await ctx.send('Please check input and try again. If problem persist please us the mods project id found on the mods homepage.')
+            await ctx.send('Please check input and try again. If problem persist please use the mods project id found on the mods homepage.')
             return
 
         if self.mod_exists(mod['id']):
@@ -130,11 +134,17 @@ class Suggest(commands.Cog):
 
         newEmbed = discord.Embed(title=mod['name'])
         newEmbed.add_field(name='Link', value=mod['websiteUrl'])
-        message = await ctx.send(embed=newEmbed)
+        channel = self.bot.get_channel(self.data['SuggestionChannelId'])
+        message = await channel.send(embed=newEmbed)
         await message.add_reaction('👍')
         await message.add_reaction('👎')
 
         self.add_mod(mod['id'],message.guild.id,message.channel.id, message.id)
+
+    @commands.command
+    async def set_channel(self, ctx, *, channelToChange : str = '', id : str = ''):
+        await ctx.send('set channel command')
+        
 
 def setup(bot):
     bot.add_cog(Suggest(bot))
