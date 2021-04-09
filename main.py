@@ -37,9 +37,4 @@ async def reload(ctx):
 
 bot.load_extension('cogs.suggest')
 
-if data['BotToken'] == '':
-  token = os.getenv('TOKEN')
-else:
-  token = data['BotToken']
-
-bot.run(token)
+bot.run(data['BotToken'])
