@@ -10,6 +10,7 @@ class Suggest(commands.Cog):
         self.bot = bot
 
     data = None
+    messageId = None
     def json_exist(self, file_name):
         return os.path.exists(file_name)
 
@@ -33,7 +34,9 @@ class Suggest(commands.Cog):
                             "ChannelId":0,
                             "MessageId": 0,
                             "ChannelUrl": f'',
-                            "Comments":''
+                            "Comments":'', 
+                            "Name": '',
+                            "WebsiteUrl":''
                         }
                     ]
             }
@@ -55,15 +58,17 @@ class Suggest(commands.Cog):
 
         return False
 
-    def add_mod(self, modId,guildId,channelId, messageId, comments):
+    def add_mod(self, mod, message, comments, stage : str = 'suggestion'):
         newSuggestion = {
-            "ModId": modId,
-            "CurrentStage": "suggestion",
-            "GuildId:":guildId,
-            "ChannelId":channelId,
-            "MessageId": messageId,
+            "ModId": mod['id'],
+            "CurrentStage": stage.lower(),
+            "GuildId:":message.guild.id,
+            "ChannelId":message.channel.id,
+            "MessageId": message.id,
             "Comments" : '',
-            "ChannelUrl": f'https://discord.com/channels/{guildId}/{channelId}/{messageId}'
+            "ChannelUrl": f'https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}',
+            "Name": mod['name'], 
+            "WebsiteUrl": mod['websiteUrl']
         }
 
         self.data["Suggestions"].append(newSuggestion)
@@ -108,15 +113,15 @@ class Suggest(commands.Cog):
         return None
 
     def update_mod(self, message, currentStage, mod, comments):
-        for x in self.data:
+        for x in self.data['Suggestions']:
             if x['ModId'] == mod['ModId']:
-                x['MessageId'] == message.id
+                x['MessageId'] = message.id
                 x['ChannelId'] = message.channel.id
                 x['ChannelUrl'] = f'https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}'
                 x['CurrentStage'] = currentStage.lower()
                 x['Comments'] = comments
 
-        with open('storage.json' 'w') as f:
+        with open('storage.json','w') as f:
             json.dump(self.data, f, sort_keys=True, indent=4)
 
     @commands.command()
@@ -137,9 +142,9 @@ class Suggest(commands.Cog):
             return
 
         if self.mod_exists(mod['id']):
-            newEmbed = discord.Embed(title='Mod has already been suggested..See below')
+            newEmbed = discord.Embed(title='Mod has already been suggested..')
             modId = mod['id']
-            newEmbed.add_field(name='Message:', value=f'{self.return_message_url(modId)}')
+            newEmbed.add_field(name='Message Link:', value=f'{self.return_message_url(modId)}')
             await ctx.send(embed=newEmbed)
             return
             
@@ -147,41 +152,44 @@ class Suggest(commands.Cog):
             await ctx.send('This mod does not appear to be fabric. Mod has submitted pending approval by a Staff member.')
             channel = self.bot.get_channel(self.data['PendingChannelId'])
             newEmbed = discord.Embed(title=mod['name'])
-            newEmbed.add_field(name='Link:', value=mod['websiteUrl'])
-            newEmbed.add_field(name='ID:', value=mod['id'])
+            newEmbed.add_field(name='ID:', value=mod['id'],inline=False)
+            newEmbed.add_field(name='Link:', value=mod['websiteUrl'], inline=False)
             message = await channel.send(embed=newEmbed)
+            self.add_mod(mod,message,'','pending')
             return
 
         newEmbed = discord.Embed(title=mod['name'])
-        newEmbed.add_field(name='Link:', value=mod['websiteUrl'])
-        newEmbed.add_field(name='ID:', value=mod['id'])
+        newEmbed.add_field(name='ID:', value=mod['id'], inline=False)
+        newEmbed.add_field(name='Link:', value=mod['websiteUrl'], inline=False)
         channel = self.bot.get_channel(self.data['SuggestionChannelId'])
         message = await channel.send(embed=newEmbed)
         await message.add_reaction('👍')
         await message.add_reaction('👎')
 
-        self.add_mod(mod['id'],message.guild.id,message.channel.id, message.id, '')
+        self.add_mod(mod,message,'','pending')
 
     @commands.command()
-    async def move(self, ctx, *, id : str = '', channelToChange : str = '', comments : str  = ''):
+    async def move(self, ctx,id : str = '', channelToChange : str = '', *, comments = ''):
         if self.data == None:
             self.load_storage()
 
-        selectedMod = None
+
+        selectedMod = {}
         for x in self.data['Suggestions']:
-            if x['ModId'] == id:
+            if x['ModId'] == int(id):
                 selectedMod = x
 
         if selectedMod is None:
             await ctx.send('Could not find exisiting mod. Check input and retry.')
+            return
 
         channel = None
 
         if channelToChange.lower() == 'suggestions':
-            channel = self.bot.get_channel(self.data['SuggestionChanne;'])
+            channel = self.bot.get_channel(self.data['SuggestionChannelId'])
 
         if channelToChange.lower() == 'denied':
-            channel = self.bot.get_channel(self.data['DeniedChannel'])
+            channel = self.bot.get_channel(self.data['DeniedChannelId'])
 
         if channelToChange.lower() == 'testing':
             channel = self.bot.get_channel('TestingChannelId')
@@ -191,23 +199,28 @@ class Suggest(commands.Cog):
 
         if channel == None:
             await ctx.send('Please specify a valid channel.')
+            return
 
-        oldMsg = self.bot.get_channel(selectedMod['ChannelId']).fetch_message(selectedMod['MessageId'])
+        newEmbed = discord.Embed(title=selectedMod['Name'])
+        newEmbed.add_field(name='Id', value=selectedMod['ModId'],inline=False)
+        newEmbed.add_field(name='Link', value=selectedMod['WebsiteUrl'], inline=False)
+
+        if channelToChange.lower() == 'denied':
+            newEmbed.add_field(name='Comments:', value = comments, inline=False)
+
+        channelId = selectedMod['ChannelId']
+        messageId = selectedMod['MessageId']
+        oldChannel = self.bot.get_channel(channelId)
+        oldMsg = await oldChannel.fetch_message(messageId)
         await oldMsg.delete()
-
-        newEmbed = discord.Embed(title=selectedMod['name'])
-        newEmbed.add_field(name='Link', value=selectedMod['websiteUrl'])
-
-        if selectedMod['CurrentStage'] == 'denied':
-            newEmbed.add_field(name='Comments:', value = comments)
-
+        
         message = await channel.send(embed=newEmbed)
 
-        if channelToChange.lower == 'suggestion':
+        if channelToChange.lower() == 'suggestions':
             await message.add_reaction('👍')
             await message.add_reaction('👎')
 
-        self.update_mod(message, channelToChange.lower, selectedMod, comments)
+        self.update_mod(message, channelToChange.lower(), selectedMod, comments)
         
             
 
