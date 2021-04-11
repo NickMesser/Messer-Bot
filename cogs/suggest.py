@@ -124,6 +124,8 @@ class Suggest(commands.Cog):
         with open('storage.json','w') as f:
             json.dump(self.data, f, sort_keys=True, indent=4)
 
+    @commands.guild_only()
+    @commands.cooldown(1,3, commands.BucketType.user)
     @commands.command()
     async def suggest(self, ctx,* ,userInput: str = ''):
         if self.data == None:
@@ -166,15 +168,17 @@ class Suggest(commands.Cog):
         await message.add_reaction('👍')
         await message.add_reaction('👎')
 
+        await ctx.message.add_reaction('👌')
+
         self.add_mod(mod,message,'','pending')
 
-    @commands.command()
+    @commands.guild_only()
+    @commands.command(aliases=['approve','testing'])
     async def move(self, ctx,id : str = '', channelToChange : str = '', *, comments = ''):
         if self.data == None:
             self.load_storage()
 
-
-        selectedMod = {}
+        selectedMod = None
         for x in self.data['Suggestions']:
             if x['ModId'] == int(id):
                 selectedMod = x
@@ -183,7 +187,19 @@ class Suggest(commands.Cog):
             await ctx.send('Could not find exisiting mod. Check input and retry.')
             return
 
+        if '!!approve' in ctx.message.content:
+            channelToChange == 'suggestions'
+
+        if '!!testing' in ctx.message.content:
+            channelToChange == 'testing'
+
         channel = None
+
+        if '!!approve' in ctx.message.content:
+            channel = self.bot.get_channel(self.data['SuggestionChannelId'])
+
+        if '!!testing' in ctx.message.content:
+            channel = self.bot.get_channel(self.data['TestingChannelId'])
 
         if channelToChange.lower() == 'suggestions':
             channel = self.bot.get_channel(self.data['SuggestionChannelId'])
@@ -192,7 +208,7 @@ class Suggest(commands.Cog):
             channel = self.bot.get_channel(self.data['DeniedChannelId'])
 
         if channelToChange.lower() == 'testing':
-            channel = self.bot.get_channel('TestingChannelId')
+            channel = self.bot.get_channel(self.data['TestingChannelId'])
 
         if channelToChange.lower() == 'pending':
             channelToChange = self.bot.get_channel(self.data['PendingChannelId'])
@@ -205,25 +221,59 @@ class Suggest(commands.Cog):
         newEmbed.add_field(name='Id', value=selectedMod['ModId'],inline=False)
         newEmbed.add_field(name='Link', value=selectedMod['WebsiteUrl'], inline=False)
 
-        if channelToChange.lower() == 'denied':
+        if channelToChange.lower() == 'denied' and comments != '':
             newEmbed.add_field(name='Comments:', value = comments, inline=False)
 
-        channelId = selectedMod['ChannelId']
         messageId = selectedMod['MessageId']
-        oldChannel = self.bot.get_channel(channelId)
+        oldChannel = self.bot.get_channel(selectedMod['ChannelId'])
         oldMsg = await oldChannel.fetch_message(messageId)
         await oldMsg.delete()
         
         message = await channel.send(embed=newEmbed)
+        await ctx.message.add_reaction('👌')
+
+        print(channelToChange)
 
         if channelToChange.lower() == 'suggestions':
             await message.add_reaction('👍')
             await message.add_reaction('👎')
 
         self.update_mod(message, channelToChange.lower(), selectedMod, comments)
-        
-            
 
+    @commands.guild_only()
+    @commands.command()
+    async def deny(self, ctx, id: str = '', *, reason: str = ''):
+        if self.data == None:
+            self.load_storage()
+
+        selectedMod = {}
+        for x in self.data['Suggestions']:
+            if x['ModId'] == int(id):
+                selectedMod = x
+
+        if selectedMod is None:
+            await ctx.send('Could not find exisiting mod. Check input and retry.')
+            return
+
+        channel = self.bot.get_channel(self.data['DeniedChannelId'])
+
+        messageId = selectedMod['MessageId']
+        oldChannel = self.bot.get_channel(selectedMod['ChannelId'])
+        oldMsg = await oldChannel.fetch_message(messageId)
+        await oldMsg.delete()
+
+        newEmbed = discord.Embed(title=selectedMod['Name'])
+        newEmbed.add_field(name='Id', value=selectedMod['ModId'],inline=False)
+        newEmbed.add_field(name='Link', value=selectedMod['WebsiteUrl'], inline=False)
+
+        if reason != '':
+            newEmbed.add_field(name='Comments:', value = reason, inline=False)
+
+        message = await channel.send(embed=newEmbed)
+        await ctx.message.add_reaction('👌')
+
+        self.update_mod(message, 'denied', selectedMod, reason)
+        
 
 def setup(bot):
     bot.add_cog(Suggest(bot))
