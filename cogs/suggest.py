@@ -189,10 +189,10 @@ class Suggest(commands.Cog):
             return
 
         if '!!approve' in ctx.message.content:
-            channelToChange == 'suggestions'
+            channelToChange = 'suggestions'
 
         if '!!testing' in ctx.message.content:
-            channelToChange == 'testing'
+            channelToChange = 'testing'
 
         info = comments[:200] + (comments[200:] and '..')
 
@@ -214,7 +214,7 @@ class Suggest(commands.Cog):
             channel = self.bot.get_channel(self.data['TestingChannelId'])
 
         if channelToChange.lower() == 'pending':
-            channelToChange = self.bot.get_channel(self.data['PendingChannelId'])
+            channel = self.bot.get_channel(self.data['PendingChannelId'])
 
         if channel == None:
             await ctx.send('Please specify a valid channel.')
@@ -235,9 +235,8 @@ class Suggest(commands.Cog):
         message = await channel.send(embed=newEmbed)
         await ctx.message.add_reaction('👌')
 
-        print(channelToChange)
-
         if channelToChange.lower() == 'suggestions':
+            print('I made it into here!')
             await message.add_reaction('👍')
             await message.add_reaction('👎')
 
