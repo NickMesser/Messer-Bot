@@ -174,6 +174,7 @@ class Suggest(commands.Cog):
 
     @commands.guild_only()
     @commands.command(aliases=['approve','testing'])
+    @commands.has_role(['Moderator', 'Team AOF', 'Mod Tester'])
     async def move(self, ctx,id : str = '9999999', channelToChange : str = '', *, comments = ''):
         if self.data == None:
             self.load_storage()
@@ -185,7 +186,7 @@ class Suggest(commands.Cog):
                     selectedMod = x
 
         if selectedMod is None:
-            await ctx.send('Could not find exisiting mod. Check input and retry.')
+            await ctx.send('Could not find existing mod. Check input and retry.')
             return
 
         if '!!approve' in ctx.message.content:
@@ -242,6 +243,7 @@ class Suggest(commands.Cog):
 
         self.update_mod(message, channelToChange.lower(), selectedMod, info)
 
+    @commands.has_role(['Moderator', 'Team AOF', 'Mod Tester'])
     @commands.guild_only()
     @commands.command()
     async def deny(self, ctx, id: str = '999999999', *, reason: str = ''):
@@ -255,7 +257,7 @@ class Suggest(commands.Cog):
                     selectedMod = x
 
         if selectedMod is None:
-            await ctx.send('Could not find exisiting mod. Check input and retry.')
+            await ctx.send('Could not find existing mod. Check input and retry.')
             return
 
         info = reason[:200] + (reason[200:] and '..')
