@@ -174,7 +174,7 @@ class Suggest(commands.Cog):
 
     @commands.guild_only()
     @commands.command(aliases=['approve','testing'])
-    @commands.has_role(['Moderator', 'Team AOF', 'Mod Tester'])
+    @commands.has_any_role('Moderator', 'Team AOF', 'Mod Tester')
     async def move(self, ctx,id : str = '9999999', channelToChange : str = '', *, comments = ''):
         if self.data == None:
             self.load_storage()
@@ -243,7 +243,7 @@ class Suggest(commands.Cog):
 
         self.update_mod(message, channelToChange.lower(), selectedMod, info)
 
-    @commands.has_role(['Moderator', 'Team AOF', 'Mod Tester'])
+    @commands.has_any_role('Moderator', 'Team AOF', 'Mod Tester')
     @commands.guild_only()
     @commands.command()
     async def deny(self, ctx, id: str = '999999999', *, reason: str = ''):
