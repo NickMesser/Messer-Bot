@@ -77,11 +77,14 @@ class Suggest(commands.Cog):
 
     def remove_mod_from_database(self, modId=0):
         if not modId:
-            return
+            return False
+        if not self.mod_exists(modId):
+            return False
 
         self.data['Suggestions'] = [x for x in self.data['Suggestions'] if x['ModId'] != modId]
         with open('storage.json','w') as f:
             json.dump(self.data, f, sort_keys=True, indent=4)
+        return True
 
     def return_message_url(self, modId):
         for x in self.data['Suggestions']:
@@ -294,6 +297,9 @@ class Suggest(commands.Cog):
     @commands.command()
     async def remove(self, ctx,* ,modId: str = ''):
         if not modId:
+            return
+        if not self.mod_exists(modId):
+            await ctx.send('Could not find existing mod. Check input and retry.')
             return
 
         if self.data == None:
