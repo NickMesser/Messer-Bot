@@ -82,8 +82,10 @@ class Suggest(commands.Cog):
             return False
 
         self.data['Suggestions'] = [x for x in self.data['Suggestions'] if x['ModId'] != modId]
+
         with open('storage.json','w') as f:
             json.dump(self.data, f, sort_keys=True, indent=4)
+
         return True
 
     def return_message_url(self, modId):
@@ -314,9 +316,10 @@ class Suggest(commands.Cog):
                 oldMsg = await oldChannel.fetch_message(messageId)
                 await oldMsg.delete()
 
-        self.remove_mod_from_database(modId)
-        await ctx.message.add_reaction('👌')
-
+        if self.remove_mod_from_database(modId):
+            await ctx.message.add_reaction('👌')
+        else:
+            await ctx.send('Could not delete the mod.')
 
 
 def setup(bot):
