@@ -78,8 +78,6 @@ class Suggest(commands.Cog):
     def remove_mod_from_database(self, modId=0):
         if not modId:
             return False
-        if not self.mod_exists(modId):
-            return False
 
         self.data['Suggestions'] = [x for x in self.data['Suggestions'] if x['ModId'] != modId]
 
