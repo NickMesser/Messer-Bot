@@ -34,7 +34,7 @@ class Suggest(commands.Cog):
                             "ChannelId":0,
                             "MessageId": 0,
                             "ChannelUrl": f'',
-                            "Comments":'', 
+                            "Comments":'',
                             "Name": '',
                             "WebsiteUrl":''
                         }
@@ -67,13 +67,24 @@ class Suggest(commands.Cog):
             "MessageId": message.id,
             "Comments" : '',
             "ChannelUrl": f'https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}',
-            "Name": mod['name'], 
+            "Name": mod['name'],
             "WebsiteUrl": mod['websiteUrl']
         }
 
         self.data["Suggestions"].append(newSuggestion)
         with open("storage.json", "w") as f:
             json.dump(self.data, f, sort_keys=True, indent=4)
+
+    def remove_mod_from_database(self, modId=0):
+        if not modId:
+            return False
+
+        self.data['Suggestions'] = [x for x in self.data['Suggestions'] if x['ModId'] != modId]
+
+        with open('storage.json','w') as f:
+            json.dump(self.data, f, sort_keys=True, indent=4)
+
+        return True
 
     def return_message_url(self, modId):
         for x in self.data['Suggestions']:
@@ -101,7 +112,7 @@ class Suggest(commands.Cog):
         searchString = split[1]
         header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Safari/605.1.15'}
         responce = requests.get(f'https://addons-ecs.forgesvc.net/api/v2/addon/search?categoryId=0&gameId=432&gameVersion=&index=0&pageSize=255&searchFilter={searchString}&sectionId=0&sort=0', headers=header)
-        
+
         if responce.status_code != 200:
             return None
 
@@ -149,7 +160,7 @@ class Suggest(commands.Cog):
             newEmbed.add_field(name='Message Link:', value=f'{self.return_message_url(modId)}')
             await ctx.send(embed=newEmbed)
             return
-            
+
         if self.is_mod_fabric(mod) == False or mod['isAvailable'] == False or mod['gameSlug'] != 'minecraft':
             await ctx.send('This mod does not appear to be fabric. Mod has submitted pending approval by a Staff member.')
             channel = self.bot.get_channel(self.data['PendingChannelId'])
@@ -232,7 +243,7 @@ class Suggest(commands.Cog):
         oldChannel = self.bot.get_channel(selectedMod['ChannelId'])
         oldMsg = await oldChannel.fetch_message(messageId)
         await oldMsg.delete()
-        
+
         message = await channel.send(embed=newEmbed)
         await ctx.message.add_reaction('👌')
 
@@ -280,7 +291,34 @@ class Suggest(commands.Cog):
         await ctx.message.add_reaction('👌')
 
         self.update_mod(message, 'denied', selectedMod, info)
-        
+
+    @commands.has_any_role('Moderator', 'Team AOF', 'Mod Tester')
+    @commands.guild_only()
+    @commands.command()
+    async def remove(self, ctx,* ,modId: str = ''):
+        if not modId:
+            return
+        if not self.mod_exists(modId):
+            await ctx.send('Could not find existing mod. Check input and retry.')
+            return
+
+        if self.data == None:
+            self.load_storage()
+
+        modId=int(modId.strip())
+
+        for x in self.data['Suggestions']:
+            if x['ModId'] == modId:
+                messageId = x['MessageId']
+                oldChannel = self.bot.get_channel(x['ChannelId'])
+                oldMsg = await oldChannel.fetch_message(messageId)
+                await oldMsg.delete()
+
+        if self.remove_mod_from_database(modId):
+            await ctx.message.add_reaction('👌')
+        else:
+            await ctx.send('Could not delete the mod.')
+
 
 def setup(bot):
     bot.add_cog(Suggest(bot))
