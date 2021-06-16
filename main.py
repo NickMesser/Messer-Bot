@@ -29,12 +29,6 @@ bot = commands.Bot(command_prefix=data['BotPrefix'])
 async def on_ready():
     print('We have logged in as {0.user}'.format(bot))
 
-
-@commands.command
-async def reload(ctx):
-    bot.load_extension('cogs.suggest')
-    ctx.send('Reloaded commands...')
-
 bot.load_extension('cogs.suggest')
 
 bot.run(data['BotToken'])

@@ -10,9 +10,13 @@ class Suggest(commands.Cog):
         self.bot = bot
 
     data = None
-    messageId = None
     def json_exist(self, file_name):
         return os.path.exists(file_name)
+
+    def save_storage(self):
+        with open('storage.json','w') as f:
+            json.dump(self.data, f, sort_keys=True, indent=4)
+
 
     def load_storage(self):
         if os.path.exists('storage.json'):
@@ -36,7 +40,9 @@ class Suggest(commands.Cog):
                             "ChannelUrl": f'',
                             "Comments":'',
                             "Name": '',
-                            "WebsiteUrl":''
+                            "WebsiteUrl":'',
+                            "UpVotes":0,
+                            "DownVotes":0
                         }
                     ]
             }
@@ -68,23 +74,17 @@ class Suggest(commands.Cog):
             "Comments" : '',
             "ChannelUrl": f'https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}',
             "Name": mod['name'],
-            "WebsiteUrl": mod['websiteUrl']
+            "WebsiteUrl": mod['websiteUrl'],
+            "UpVotes":0,
+            "DownVotes":0
         }
 
         self.data["Suggestions"].append(newSuggestion)
-        with open("storage.json", "w") as f:
-            json.dump(self.data, f, sort_keys=True, indent=4)
+        self.save_storage()
 
-    def remove_mod_from_database(self, modId=0):
-        if not modId:
-            return False
-
-        self.data['Suggestions'] = [x for x in self.data['Suggestions'] if x['ModId'] != modId]
-
-        with open('storage.json','w') as f:
-            json.dump(self.data, f, sort_keys=True, indent=4)
-
-        return True
+    def remove_mod_from_database(self, mod):
+        self.data['Suggestions'].remove(mod)
+        self.save_storage()
 
     def return_message_url(self, modId):
         for x in self.data['Suggestions']:
@@ -106,6 +106,18 @@ class Suggest(commands.Cog):
             return None
 
         return response.json()
+
+    def get_mod_by_message_id(self, messageId):
+        for x in self.data['Suggestions']:
+            if x['MessageId'] == messageId:
+                return x
+
+    def get_mod_by_mod_id(self, modId):
+        for x in self.data['Suggestions']:
+            if x['ModId'] == int(modId):
+                return x
+            
+        return None
 
     def get_mod_data_by_url(self, ctx, url):
         split = url.split('mc-mods/')
@@ -132,15 +144,12 @@ class Suggest(commands.Cog):
                 x['CurrentStage'] = currentStage.lower()
                 x['Comments'] = comments
 
-        with open('storage.json','w') as f:
-            json.dump(self.data, f, sort_keys=True, indent=4)
+        self.save_storage()
 
     @commands.guild_only()
     @commands.cooldown(1,3, commands.BucketType.user)
     @commands.command()
     async def suggest(self, ctx,* ,userInput: str = ''):
-        if self.data == None:
-            self.load_storage()
 
         if ctx.message.channel.id != self.data['DiscussionChannelId']:
             return
@@ -185,17 +194,10 @@ class Suggest(commands.Cog):
 
     @commands.guild_only()
     @commands.command(aliases=['approve','testing'])
-    @commands.has_any_role('Moderator', 'Team AOF', 'Mod Tester')
+    @commands.has_any_role('Moderator', 'Team AOF', 'Trusted')
     async def move(self, ctx,id : str = '9999999', channelToChange : str = '', *, comments = ''):
-        if self.data == None:
-            self.load_storage()
 
-        selectedMod = None
-        for x in self.data['Suggestions']:
-            if id.isnumeric():
-                if x['ModId'] == int(id):
-                    selectedMod = x
-
+        selectedMod = self.get_mod_by_mod_id(id)
         if selectedMod is None:
             await ctx.send('Could not find existing mod. Check input and retry.')
             return
@@ -254,19 +256,12 @@ class Suggest(commands.Cog):
 
         self.update_mod(message, channelToChange.lower(), selectedMod, info)
 
-    @commands.has_any_role('Moderator', 'Team AOF', 'Mod Tester')
+    @commands.has_any_role('Moderator', 'Team AOF', 'Trusted')
     @commands.guild_only()
     @commands.command()
     async def deny(self, ctx, id: str = '999999999', *, reason: str = ''):
-        if self.data == None:
-            self.load_storage()
 
-        selectedMod = None
-        for x in self.data['Suggestions']:
-            if id.isnumeric():
-                if x['ModId'] == int(id):
-                    selectedMod = x
-
+        selectedMod = self.get_mod_by_mod_id(id)
         if selectedMod is None:
             await ctx.send('Could not find existing mod. Check input and retry.')
             return
@@ -292,32 +287,66 @@ class Suggest(commands.Cog):
 
         self.update_mod(message, 'denied', selectedMod, info)
 
-    @commands.has_any_role('Moderator', 'Team AOF', 'Mod Tester')
+    @commands.has_any_role('Moderator', 'Team AOF', 'Trusted')
     @commands.guild_only()
     @commands.command()
-    async def remove(self, ctx,* ,modId: str = ''):
-        if not modId:
-            return
-        if not self.mod_exists(modId):
+    async def remove(self, ctx,* ,modId: str = '999999999999'):
+
+        mod = self.get_mod_by_mod_id(modId)
+
+        if mod == None:
             await ctx.send('Could not find existing mod. Check input and retry.')
             return
 
+        messageId = mod['MessageId']
+        oldChannel = self.bot.get_channel(mod['ChannelId'])
+        oldMsg = await oldChannel.fetch_message(messageId)
+        await oldMsg.delete()
+
+        self.remove_mod_from_database(mod)
+        await ctx.message.add_reaction('👌')
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        self.load_storage()
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+
+        messageId = payload.message_id
+
+        mod = self.get_mod_by_message_id(messageId)
+
+        if mod == None:
+            return
+
+        if payload.emoji.name == '👍':
+            mod['UpVotes'] += 1
+            self.save_storage()
+
+        if payload.emoji.name == '👎':
+            mod['DownVotes'] += 1
+            self.save_storage()
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
         if self.data == None:
             self.load_storage()
 
-        modId=int(modId.strip())
+        messageId = payload.message_id
 
-        for x in self.data['Suggestions']:
-            if x['ModId'] == modId:
-                messageId = x['MessageId']
-                oldChannel = self.bot.get_channel(x['ChannelId'])
-                oldMsg = await oldChannel.fetch_message(messageId)
-                await oldMsg.delete()
+        mod = self.get_mod_by_message_id(messageId)
 
-        if self.remove_mod_from_database(modId):
-            await ctx.message.add_reaction('👌')
-        else:
-            await ctx.send('Could not delete the mod.')
+        if mod == None:
+            return
+
+        if payload.emoji.name == '👍':
+            mod['UpVotes'] -= 1
+            self.save_storage()
+
+        if payload.emoji.name == '👎':
+            mod['DownVotes'] -= 1
+            self.save_storage()
 
 
 def setup(bot):
