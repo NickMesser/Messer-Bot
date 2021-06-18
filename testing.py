@@ -1,15 +1,5 @@
-import json
+import pymongo
 
-with open('storage.json') as h:
-    data = json.load(h)
+myclient = pymongo.MongoClient("mongodb://localhost:27017/")
 
-sortedSuggestions = []
-
-for mod in data['Suggestions']:
-    if mod['CurrentStage'] == 'denied':
-        sortedSuggestions.append(mod)
-
-data['Suggestions'] = sortedSuggestions
-
-with open('storage.json', 'w') as f:
-    json.dump(data, f, sort_keys=True, indent=4)
+print(myclient.list_database_names())

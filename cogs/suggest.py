@@ -3,7 +3,6 @@ from discord.ext import commands
 import requests
 import json
 import os
-import time
 
 class Suggest(commands.Cog):
     def __init__(self, bot):
@@ -42,7 +41,9 @@ class Suggest(commands.Cog):
                             "Name": '',
                             "WebsiteUrl":'',
                             "UpVotes":0,
-                            "DownVotes":0
+                            "DownVotes":0,
+                            "ThumbnailUrl": '',
+                            "ModAuthor": ''
                         }
                     ]
             }
@@ -76,7 +77,9 @@ class Suggest(commands.Cog):
             "Name": mod['name'],
             "WebsiteUrl": mod['websiteUrl'],
             "UpVotes":0,
-            "DownVotes":0
+            "DownVotes":0,
+            "ThumbnailUrl": mod['attachments'][0]['thumbnailUrl'],
+            "ModAuthor": mod['authors'][0]['name']
         }
 
         self.data["Suggestions"].append(newSuggestion)
@@ -171,18 +174,31 @@ class Suggest(commands.Cog):
             return
 
         if self.is_mod_fabric(mod) == False or mod['isAvailable'] == False or mod['gameSlug'] != 'minecraft':
-            await ctx.send('This mod does not appear to be fabric. Mod has submitted pending approval by a Staff member.')
+            await ctx.send('This mod does not appear to be a fabric mod. Mod has been submitted pending approval by a team member.')
             channel = self.bot.get_channel(self.data['PendingChannelId'])
-            newEmbed = discord.Embed(title=mod['name'])
-            newEmbed.add_field(name='ID:', value=mod['id'],inline=False)
-            newEmbed.add_field(name='Link:', value=mod['websiteUrl'], inline=False)
+
+            newEmbed = discord.Embed(title=mod['name'],url=mod['websiteUrl'],
+            color=0x00fdff,
+            description='Created by: {}'.format(mod['authors'][0]['name']))
+
+            newEmbed.add_field(name='Status:',value="Pending", inline=False)
+            newEmbed.add_field(name='Comments',value='Currently being voted on.',inline=False)
+            newEmbed.set_footer(text='Mod Id: {}'.format(mod['id']))
+            newEmbed.set_thumbnail(url='{}'.format(mod['attachments'][0]['thumbnailUrl']))
+            
             message = await channel.send(embed=newEmbed)
             self.add_mod(mod,message,'','pending')
             return
 
-        newEmbed = discord.Embed(title=mod['name'])
-        newEmbed.add_field(name='ID:', value=mod['id'], inline=False)
-        newEmbed.add_field(name='Link:', value=mod['websiteUrl'], inline=False)
+        newEmbed = discord.Embed(title=mod['name'],url=mod['websiteUrl'],
+        color=0x00f900,
+        description='Created by: {}'.format(mod['authors'][0]['name']))
+        
+        newEmbed.add_field(name='Status:',value="Voting", inline=False)
+        newEmbed.add_field(name='Comments',value='Currently being voted on.',inline=False)
+        newEmbed.set_footer(text='Mod Id: {}'.format(mod['id']))
+        newEmbed.set_thumbnail(url='{}'.format(mod['attachments'][0]['thumbnailUrl']))
+
         channel = self.bot.get_channel(self.data['SuggestionChannelId'])
         message = await channel.send(embed=newEmbed)
         await message.add_reaction('👍')
@@ -190,7 +206,7 @@ class Suggest(commands.Cog):
 
         await ctx.message.add_reaction('👌')
 
-        self.add_mod(mod,message,'','pending')
+        self.add_mod(mod,message,'','Voting')
 
     @commands.guild_only()
     @commands.command(aliases=['approve','testing'])
@@ -202,44 +218,35 @@ class Suggest(commands.Cog):
             await ctx.send('Could not find existing mod. Check input and retry.')
             return
 
-        if '!!approve' in ctx.message.content:
-            channelToChange = 'suggestions'
-
-        if '!!testing' in ctx.message.content:
-            channelToChange = 'testing'
-
         info = comments[:200] + (comments[200:] and '..')
 
         channel = None
+        status = ''
 
         if '!!approve' in ctx.message.content:
             channel = self.bot.get_channel(self.data['SuggestionChannelId'])
+            status = 'Voting'
 
         if '!!testing' in ctx.message.content:
             channel = self.bot.get_channel(self.data['TestingChannelId'])
+            status = 'Testing'
 
-        if channelToChange.lower() == 'suggestions':
-            channel = self.bot.get_channel(self.data['SuggestionChannelId'])
+        newEmbed = discord.Embed(title=selectedMod['Name'],
+        url=selectedMod['WebsiteUrl'],
+        description='Created by: {}'.format(selectedMod['ModAuthor']))
+        
+        if '!!approve' in ctx.message.content:
+            newEmbed.add_field(name='Status:',value="Voting", inline=False)
+            newEmbed.add_field(name='Comments',value='Currently being voted on.',inline=False)
+            newEmbed.color=0x00f900
 
-        if channelToChange.lower() == 'denied':
-            channel = self.bot.get_channel(self.data['DeniedChannelId'])
+        if '!!testing' in ctx.message.content:
+            newEmbed.add_field(name='Status:',value="Testing", inline=False)
+            newEmbed.add_field(name='Comments',value='Currently being tested',inline=False)
+            newEmbed.color=0xfffb00
 
-        if channelToChange.lower() == 'testing':
-            channel = self.bot.get_channel(self.data['TestingChannelId'])
-
-        if channelToChange.lower() == 'pending':
-            channel = self.bot.get_channel(self.data['PendingChannelId'])
-
-        if channel == None:
-            await ctx.send('Please specify a valid channel.')
-            return
-
-        newEmbed = discord.Embed(title=selectedMod['Name'])
-        newEmbed.add_field(name='Id', value=selectedMod['ModId'],inline=False)
-        newEmbed.add_field(name='Link', value=selectedMod['WebsiteUrl'], inline=False)
-
-        if channelToChange.lower() == 'denied' and info != '':
-            newEmbed.add_field(name='Comments:', value = info, inline=False)
+        newEmbed.set_footer(text='Mod Id: {}'.format(selectedMod['ModId']))
+        newEmbed.set_thumbnail(url='{}'.format(selectedMod['ThumbnailUrl']))
 
         messageId = selectedMod['MessageId']
         oldChannel = self.bot.get_channel(selectedMod['ChannelId'])
@@ -249,12 +256,11 @@ class Suggest(commands.Cog):
         message = await channel.send(embed=newEmbed)
         await ctx.message.add_reaction('👌')
 
-        if channelToChange.lower() == 'suggestions':
-            print('I made it into here!')
+        if '!!approve' in ctx.message.content:
             await message.add_reaction('👍')
             await message.add_reaction('👎')
 
-        self.update_mod(message, channelToChange.lower(), selectedMod, info)
+        self.update_mod(message, status, selectedMod, info)
 
     @commands.has_any_role('Moderator', 'Team AOF', 'Trusted')
     @commands.guild_only()
@@ -275,17 +281,24 @@ class Suggest(commands.Cog):
         oldMsg = await oldChannel.fetch_message(messageId)
         await oldMsg.delete()
 
-        newEmbed = discord.Embed(title=selectedMod['Name'])
-        newEmbed.add_field(name='Id', value=selectedMod['ModId'],inline=False)
-        newEmbed.add_field(name='Link', value=selectedMod['WebsiteUrl'], inline=False)
+        newEmbed = discord.Embed(title=selectedMod['Name'],
+            url=selectedMod['WebsiteUrl'],
+            color=0xff2600,
+            description='Created by: {}'.format(selectedMod['ModAuthor']))
+        
+        newEmbed.add_field(name='Status:',value="Denied", inline=False)
+        newEmbed.set_footer(text='Mod Id: {}'.format(selectedMod['ModId']))
+        newEmbed.set_thumbnail(url='{}'.format(selectedMod['ThumbnailUrl']))
 
         if reason != '':
             newEmbed.add_field(name='Comments:', value = info, inline=False)
+        else:
+            newEmbed.add_field(name='Comments',value='Denied because we said so.',inline=False)
 
         message = await channel.send(embed=newEmbed)
         await ctx.message.add_reaction('👌')
 
-        self.update_mod(message, 'denied', selectedMod, info)
+        self.update_mod(message, 'Denied', selectedMod, info)
 
     @commands.has_any_role('Moderator', 'Team AOF', 'Trusted')
     @commands.guild_only()
@@ -330,8 +343,6 @@ class Suggest(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
-        if self.data == None:
-            self.load_storage()
 
         messageId = payload.message_id
 
