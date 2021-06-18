@@ -1,2 +1,3 @@
-# Taco-Bot-3000
- Bot made for submitting mc mod suggestions
+# Messer Box
+ 
+Discord bot made for the AOF Discord. Allows submission of curseforge mods and a voting/management system for those mods. 
