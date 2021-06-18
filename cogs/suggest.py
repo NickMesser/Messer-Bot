@@ -242,7 +242,7 @@ class Suggest(commands.Cog):
 
         if '!!testing' in ctx.message.content:
             newEmbed.add_field(name='Status:',value="Testing", inline=False)
-            newEmbed.add_field(name='Comments',value='Currently being tested',inline=False)
+            newEmbed.add_field(name='Comments',value='Currently being tested.',inline=False)
             newEmbed.color=0xfffb00
 
         newEmbed.set_footer(text='Mod Id: {}'.format(selectedMod['ModId']))
