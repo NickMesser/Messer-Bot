@@ -319,6 +319,30 @@ class Suggest(commands.Cog):
         self.remove_mod_from_database(mod)
         await ctx.message.add_reaction('👌')
 
+    @commands.has_any_role('Moderator', 'Team AOF', 'Trusted')
+    @commands.guild_only()
+    @commands.command()
+    async def leaderboard(self, ctx):
+
+        sortedMods = sorted(self.data['Suggestions'], key = lambda mod : mod['UpVotes']  ).reverse()
+
+        newEmbed = discord.Embed(title='Top Voted Suggestions')
+
+        count = 0
+        for x in sortedMods:
+            if count > 10:
+                break
+
+            if x['CurrentStage'] == 'voting':
+                newEmbed.add_field(name=x['Name'], value=str(x['UpVotes']),inline=False)
+                count += 1
+
+        await ctx.channel.send(embed=newEmbed)
+
+
+
+        
+
     @commands.Cog.listener()
     async def on_ready(self):
         self.load_storage()
